@@ -1,0 +1,30 @@
+# Nim
+nimcache/
+nimblecache/
+*.out
+*.exe
+*.dll
+*.so
+*.dylib
+htmldocs/
+
+# Playwright example output
+*.png
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Pre-commit
+.pre-commit-cache/
+
+# Env
+.env
+.env.local
