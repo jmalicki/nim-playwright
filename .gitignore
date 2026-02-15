@@ -7,6 +7,12 @@ nimblecache/
 *.so
 *.dylib
 htmldocs/
+# Nim-compiled binaries (no extension on Unix)
+/examples/screenshot
+/tests/test_compile
+/tests/test_wire
+/tests/test_api
+/tests/run_tests
 
 # Playwright example output
 *.png
