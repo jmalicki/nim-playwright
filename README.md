@@ -76,7 +76,15 @@ Unit tests (no browser/driver required):
 nimble test
 ```
 
-They cover wire protocol encoding/decoding, API JSON helpers, option types, and compile-time checks. See [CONTRIBUTING.md](CONTRIBUTING.md#running-tests) for the optional integration test.
+They cover wire protocol encoding/decoding, API JSON helpers, option types, and compile-time checks.
+
+E2E tests (real browser; require Node.js):
+
+```bash
+nimble testE2e   # installs Chromium if needed, then runs E2E tests
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md#running-tests) for details.
 
 ## Development
 

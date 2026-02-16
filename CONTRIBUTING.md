@@ -29,12 +29,19 @@ nimble test
 - **test_wire.nim** – wire protocol encode/decode (length-prefixed frames)
 - **test_api.nim** – `getStrFromJson` and option types
 
-Optional integration test (requires Node.js and `npx playwright run-driver`):
+Integration test (driver only):
 
 ```bash
 nimble testIntegration
-# or set PLAYWRIGHT_SKIP_INTEGRATION=1 to skip
 ```
+
+E2E tests (real browser – installs Chromium if needed):
+
+```bash
+nimble testE2e
+```
+
+These open example.com, check the page title, and take a screenshot. If the driver isn’t available, the E2E script exits with code 0 and prints SKIP.
 
 ## CI
 

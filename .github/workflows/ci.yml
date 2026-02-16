@@ -31,3 +31,26 @@ jobs:
       - name: Run tests
         run: nim c -p:src -r tests/run_tests.nim
 
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Playwright Chromium and system deps
+        run: npx -y playwright@latest install --with-deps chromium
+
+      - name: Install Nim
+        uses: jiro4989/setup-nim-action@v1
+        with:
+          nim-version: "2.0.2"
+          install-dependencies: true
+
+      - name: Run E2E tests
+        run: nim c -p:src -r tests/test_e2e.nim

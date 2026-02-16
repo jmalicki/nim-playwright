@@ -12,18 +12,18 @@ type
     stdoutStream: Stream
     nextId: int
 
-proc getDriverCommand(): seq[string] =
+proc getDriverCommand(): string =
   let cmd = getEnv("PLAYWRIGHT_NIM_DRIVER", "npx")
   if cmd == "npx":
-    @["npx", "-y", "playwright@latest", "run-driver"]
+    "npx -y playwright@latest run-driver"
   else:
-    @[cmd]
+    cmd
 
 proc startDriver*(): Driver =
   let cmd = getDriverCommand()
   var p = startProcess(
-    command = cmd[0],
-    args = if cmd.len > 1: cmd[1 .. ^1] else: @[],
+    command = cmd,
+    args = @[],
     options = {poUsePath, poEvalCommand},
     env = nil
   )

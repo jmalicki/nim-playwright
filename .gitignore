@@ -13,6 +13,7 @@ htmldocs/
 /tests/test_wire
 /tests/test_api
 /tests/run_tests
+/tests/test_e2e
 
 # Playwright example output
 *.png
