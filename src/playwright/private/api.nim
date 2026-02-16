@@ -41,6 +41,11 @@ type
   Page* = ref object
     driver: Driver
     guid: string
+    mainFrameGuid*: string  ## Set from newPage response when available
+
+  Frame* = ref object
+    driver: Driver
+    guid: string
 
 proc getStrFromJson*(j: JsonNode; key: string): string =
   ## Extract string or guid from JSON (for wire results). Exported for tests.
@@ -95,7 +100,12 @@ proc newPage*(b: Browser; options: NewPageOptions = NewPageOptions()): Page =
         "height": options.viewport.height}
   if options.ignoreHttpsErrors: params["ignoreHTTPSErrors"] = %true
   let res = b.driver.call(b.guid, "newPage", params)
-  Page(driver: b.driver, guid: res.getStr("page"))
+  let pageObj = res.getOrDefault("page")
+  let pageGuid = if pageObj.kind == JString: pageObj.getStr() else: getStr(pageObj, "guid")
+  if pageGuid.len == 0: return Page(driver: b.driver, guid: res.getStr("page"), mainFrameGuid: "")
+  let frameGuid = if pageObj.kind == JObject:
+    getStr(pageObj.getOrDefault("mainFrame"), "guid") else: ""
+  Page(driver: b.driver, guid: pageGuid, mainFrameGuid: frameGuid)
 
 proc newContext*(b: Browser): BrowserContext =
   let res = b.driver.call(b.guid, "newContext", newJObject())
@@ -128,6 +138,32 @@ proc screenshot*(page: Page; path: string = "";
 proc close*(page: Page) =
   discard page.driver.call(page.guid, "close", newJObject())
 
+proc mainFrame*(page: Page): Frame =
+  ## Return the main frame of the page (for click by selector).
+  if page.mainFrameGuid.len > 0:
+    return Frame(driver: page.driver, guid: page.mainFrameGuid)
+  let res = page.driver.call(page.guid, "mainFrame", newJObject())
+  let frameGuid = res.getStr("frame")
+  let guid = if frameGuid.len > 0: frameGuid else: res.getStr("guid")
+  Frame(driver: page.driver, guid: guid)
+
+proc click*(frame: Frame; selector: string) =
+  ## Click the element matching the selector.
+  var params = newJObject()
+  params["selector"] = %selector
+  discard frame.driver.call(frame.guid, "click", params)
+
+proc waitForSelector*(frame: Frame; selector: string; timeout: float = 5000) =
+  ## Wait for an element matching the selector to appear.
+  var params = newJObject()
+  params["selector"] = %selector
+  if timeout > 0: params["timeout"] = %timeout
+  discard frame.driver.call(frame.guid, "waitForSelector", params)
+
 proc newPage*(ctx: BrowserContext): Page =
   let res = ctx.driver.call(ctx.guid, "newPage", newJObject())
-  Page(driver: ctx.driver, guid: res.getStr("page"))
+  let pageObj = res.getOrDefault("page")
+  let pageGuid = if pageObj.kind == JString: pageObj.getStr() else: getStr(pageObj, "guid")
+  let frameGuid = if pageObj.kind == JObject:
+    getStr(pageObj.getOrDefault("mainFrame"), "guid") else: ""
+  Page(driver: ctx.driver, guid: if pageGuid.len > 0: pageGuid else: res.getStr("page"), mainFrameGuid: frameGuid)
