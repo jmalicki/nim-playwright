@@ -54,7 +54,7 @@ On push/PR to `main` or `master`, GitHub Actions:
 
 The package name is **nim_playwright** (Nimble disallows hyphens). To publish to the [official Nimble package list](https://github.com/nim-lang/packages):
 
-1. **Tag a release** (e.g. `v0.1.0`) and push to GitHub.
+1. **Create a GitHub Release** (e.g. tag `v0.1.0`). The **Release** workflow will run: it runs both the normal tests and the E2E tests; the “Publish” job only runs if both pass. Ensure that workflow is green before publishing to Nimble.
 2. **Add the package to the registry**:
    - Fork [nim-lang/packages](https://github.com/nim-lang/packages)
    - Edit `packages.json` and add an entry (see existing entries for format), e.g.:
