@@ -6,7 +6,7 @@ Nim bindings for [Playwright](https://playwright.dev/) — browser automation an
 
 - **Nim** 2.0+
 - **Node.js** (for the Playwright driver)
-- **Playwright browsers** (install once):
+- **Playwright browsers** — installed automatically when you run `nimble runExample`, or once by hand:
 
   ```bash
   npx playwright install chromium
@@ -40,11 +40,11 @@ finally:
   p.close()
 ```
 
-Run the example (from the project root):
+Run the example (from the project root). This installs Chromium if needed, then runs the script:
 
 ```bash
-nim c -p:src -r examples/screenshot.nim
-# or: nimble runExample
+nimble runExample
+# or manually: npx playwright install chromium && nim c -p:src -r examples/screenshot.nim
 ```
 
 ## API overview
