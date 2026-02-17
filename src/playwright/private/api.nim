@@ -61,29 +61,35 @@ proc initPlaywright*(): Playwright =
   let driver = startDriver()
   # Root has guid ""; call initialize to get Playwright object.
   var params = newJObject()
-  params["sdkLanguage"] = %"nim"
+  params["sdkLanguage"] = %"javascript"
   let res = driver.call("", "initialize", params)
   let pw = res.getOrDefault("playwright")
-  result = Playwright(driver: driver, guid: pw.getStr("guid"))
+  let guid = if pw != nil and pw.kind == JString: pw.getStr() else: pw.getStr("guid")
+  result = Playwright(driver: driver, guid: guid)
 
 proc close*(p: Playwright) =
   if p.driver != nil:
     p.driver.close()
     p.driver = nil
 
+proc getBrowserTypeFromInitializer(d: Driver; playwrightGuid: string; name: string): BrowserType =
+  let init = d.getCreatedInitializer(playwrightGuid)
+  if init == nil:
+    raise (ref WireError)(msg: "No initializer for Playwright (guid " & playwrightGuid & "); __create__ may not have been received")
+  let bt = init.getOrDefault(name)
+  let guid = getStrFromJson(bt, "guid")
+  if guid.len == 0:
+    raise (ref WireError)(msg: "BrowserType '" & name & "' not in Playwright initializer")
+  BrowserType(driver: d, guid: guid, name: name)
+
 proc chromium*(p: Playwright): BrowserType =
-  let res = p.driver.call(p.guid, "chromium", newJObject())
-  BrowserType(driver: p.driver, guid: res.getStr("browserType"),
-      name: "chromium")
+  getBrowserTypeFromInitializer(p.driver, p.guid, "chromium")
 
 proc firefox*(p: Playwright): BrowserType =
-  let res = p.driver.call(p.guid, "firefox", newJObject())
-  BrowserType(driver: p.driver, guid: res.getStr("browserType"),
-      name: "firefox")
+  getBrowserTypeFromInitializer(p.driver, p.guid, "firefox")
 
 proc webkit*(p: Playwright): BrowserType =
-  let res = p.driver.call(p.guid, "webkit", newJObject())
-  BrowserType(driver: p.driver, guid: res.getStr("browserType"), name: "webkit")
+  getBrowserTypeFromInitializer(p.driver, p.guid, "webkit")
 
 proc launch*(bt: BrowserType; options: LaunchOptions = LaunchOptions()): Browser =
   var params = newJObject()
@@ -93,33 +99,58 @@ proc launch*(bt: BrowserType; options: LaunchOptions = LaunchOptions()): Browser
   let res = bt.driver.call(bt.guid, "launch", params)
   Browser(driver: bt.driver, guid: res.getStr("browser"))
 
-proc newPage*(b: Browser; options: NewPageOptions = NewPageOptions()): Page =
+proc newContext*(b: Browser; options: NewPageOptions = NewPageOptions()): BrowserContext =
+  ## Create a new browser context. Playwright 1.49+ requires newContext (no browser.newPage).
   var params = newJObject()
   if options.viewport.width > 0:
     params["viewport"] = %* {"width": options.viewport.width,
         "height": options.viewport.height}
   if options.ignoreHttpsErrors: params["ignoreHTTPSErrors"] = %true
-  let res = b.driver.call(b.guid, "newPage", params)
-  let pageObj = res.getOrDefault("page")
-  let pageGuid = if pageObj.kind == JString: pageObj.getStr() else: getStr(pageObj, "guid")
-  if pageGuid.len == 0: return Page(driver: b.driver, guid: res.getStr("page"), mainFrameGuid: "")
-  let frameGuid = if pageObj.kind == JObject:
-    getStr(pageObj.getOrDefault("mainFrame"), "guid") else: ""
-  Page(driver: b.driver, guid: pageGuid, mainFrameGuid: frameGuid)
+  let res = b.driver.call(b.guid, "newContext", params)
+  BrowserContext(driver: b.driver, guid: res.getStr("context"))
 
 proc newContext*(b: Browser): BrowserContext =
-  let res = b.driver.call(b.guid, "newContext", newJObject())
-  BrowserContext(driver: b.driver, guid: res.getStr("context"))
+  b.newContext(NewPageOptions())
+
+proc newPage*(ctx: BrowserContext; options: NewPageOptions = NewPageOptions()): Page =
+  ## Create a new page in this context. Options are ignored (context already has viewport).
+  let res = ctx.driver.call(ctx.guid, "newPage", newJObject())
+  let pageObj = res.getOrDefault("page")
+  let pageGuid = if pageObj.kind == JString: pageObj.getStr() else: getStr(pageObj, "guid")
+  if pageGuid.len == 0: return Page(driver: ctx.driver, guid: res.getStr("page"), mainFrameGuid: "")
+  var frameGuid = if pageObj.kind == JObject: getStr(pageObj.getOrDefault("mainFrame"), "guid") else: ""
+  if frameGuid.len == 0:
+    let init = ctx.driver.getCreatedInitializer(pageGuid)
+    if init != nil: frameGuid = getStrFromJson(init.getOrDefault("mainFrame"), "guid")
+  Page(driver: ctx.driver, guid: pageGuid, mainFrameGuid: frameGuid)
+
+proc newPage*(b: Browser; options: NewPageOptions = NewPageOptions()): Page =
+  ## Create a new page (via newContext + context.newPage). Playwright 1.49+ has no browser.newPage.
+  let ctx = b.newContext(options)
+  newPage(ctx)
 
 proc close*(b: Browser) =
   discard b.driver.call(b.guid, "close", newJObject())
 
-proc goto*(page: Page; url: string; options: GotoOptions = GotoOptions()) =
+proc mainFrame*(page: Page): Frame =
+  ## Return the main frame of the page (for click by selector).
+  if page.mainFrameGuid.len > 0:
+    return Frame(driver: page.driver, guid: page.mainFrameGuid)
+  let res = page.driver.call(page.guid, "mainFrame", newJObject())
+  let frameGuid = res.getStr("frame")
+  let guid = if frameGuid.len > 0: frameGuid else: res.getStr("guid")
+  Frame(driver: page.driver, guid: guid)
+
+proc goto*(frame: Frame; url: string; options: GotoOptions = GotoOptions()) =
+  ## Navigate frame to url. Playwright 1.49+ has goto on Frame, not Page.
   var params = newJObject()
   params["url"] = %url
   if options.timeout > 0: params["timeout"] = %options.timeout
   if options.waitUntil.len > 0: params["waitUntil"] = %options.waitUntil
-  discard page.driver.call(page.guid, "goto", params)
+  discard frame.driver.call(frame.guid, "goto", params)
+
+proc goto*(page: Page; url: string; options: GotoOptions = GotoOptions()) =
+  page.mainFrame().goto(url, options)
 
 proc title*(page: Page): string =
   let res = page.driver.call(page.guid, "title", newJObject())
@@ -138,15 +169,6 @@ proc screenshot*(page: Page; path: string = "";
 proc close*(page: Page) =
   discard page.driver.call(page.guid, "close", newJObject())
 
-proc mainFrame*(page: Page): Frame =
-  ## Return the main frame of the page (for click by selector).
-  if page.mainFrameGuid.len > 0:
-    return Frame(driver: page.driver, guid: page.mainFrameGuid)
-  let res = page.driver.call(page.guid, "mainFrame", newJObject())
-  let frameGuid = res.getStr("frame")
-  let guid = if frameGuid.len > 0: frameGuid else: res.getStr("guid")
-  Frame(driver: page.driver, guid: guid)
-
 proc click*(frame: Frame; selector: string) =
   ## Click the element matching the selector.
   var params = newJObject()
@@ -160,10 +182,3 @@ proc waitForSelector*(frame: Frame; selector: string; timeout: float = 5000) =
   if timeout > 0: params["timeout"] = %timeout
   discard frame.driver.call(frame.guid, "waitForSelector", params)
 
-proc newPage*(ctx: BrowserContext): Page =
-  let res = ctx.driver.call(ctx.guid, "newPage", newJObject())
-  let pageObj = res.getOrDefault("page")
-  let pageGuid = if pageObj.kind == JString: pageObj.getStr() else: getStr(pageObj, "guid")
-  let frameGuid = if pageObj.kind == JObject:
-    getStr(pageObj.getOrDefault("mainFrame"), "guid") else: ""
-  Page(driver: ctx.driver, guid: if pageGuid.len > 0: pageGuid else: res.getStr("page"), mainFrameGuid: frameGuid)
