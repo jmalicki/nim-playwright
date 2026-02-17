@@ -1,0 +1,4 @@
+/* Used at compile time by nimhttpd when serve.nim imports it. Minimal for directory listing/error pages. */
+body { font-family: system-ui, sans-serif; margin: 1rem; }
+ul { list-style: none; padding: 0; }
+a { color: #06c; }

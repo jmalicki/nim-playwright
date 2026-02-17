@@ -68,6 +68,33 @@ npx -y playwright@latest run-driver
 
 Override with the environment variable **`PLAYWRIGHT_NIM_DRIVER`** (e.g. point to a local `node` + script path).
 
+## Static server for E2E
+
+For E2E tests you usually need a local HTTP server serving your app. This package provides:
+
+- **`nimplaywright-serve`** — static file server (uses [nimhttpd](https://github.com/FedericoCeratto/nimhttpd) as a library) that signals when it is listening via **`PLAYWRIGHT_SERVE_READY_FD`** (write one byte and close the fd). No HTTP polling.
+- **`nimplaywright-serve-wait`** — launcher that starts the server with a pipe, blocks until the server has signalled (or failed), then prints `PORT PID` and exits 0. Use it so your script does not proceed until the server is ready.
+
+Build the tools (requires `nimhttpd`):
+
+```bash
+nimble buildServe      # -> tools/nimplaywright-serve
+nimble buildServeWait  # -> tools/nimplaywright-serve-wait
+# or
+nimble buildTools
+```
+
+Example: from your app repo, start the server then run your E2E test binary:
+
+```bash
+export PLAYWRIGHT_SERVE_BIN=/path/to/nimplaywright-serve
+/path/to/nimplaywright-serve-wait docs > serve.out
+read -r PORT PID < serve.out
+export E2E_URL="http://127.0.0.1:$PORT/"
+./your_e2e_test_binary
+kill $PID
+```
+
 ## Tests
 
 Unit tests (no browser/driver required):

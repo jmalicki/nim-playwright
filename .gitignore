@@ -14,6 +14,8 @@ htmldocs/
 /tests/test_api
 /tests/run_tests
 /tests/test_e2e
+/tools/nimplaywright-serve
+/tools/nimplaywright-serve-wait
 
 # Playwright example output
 *.png
